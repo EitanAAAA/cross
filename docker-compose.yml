@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-video-editor-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-video-editor-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      - FRONTEND_ORIGIN=http://localhost:3000
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - ./backend/storage:/app/storage
+    ports:
+      - "4000:4000"
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-video-editor-frontend
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
