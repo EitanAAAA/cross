@@ -23,3 +23,6 @@ backend/storage/projects/*
 
 # logs
 *.log
+
+# accidental local artifacts
+melt
