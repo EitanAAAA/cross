@@ -1,0 +1,16 @@
+﻿{
+  "id": "talking_head_hook_01",
+  "instruction": "Make this talking-head clip feel punchy and modern for TikTok.",
+  "style_tags": ["tiktok", "talking_head", "snappy"],
+  "plan": {
+    "operations": [
+      { "op": "trim", "start": 0.2, "end": 8.9 },
+      { "op": "cut", "at": 1.4 },
+      { "op": "zoom_in", "start": 1.4, "end": 2.0, "anchor": "center", "strength": 1.2, "easing": "ease-out" },
+      { "op": "caption", "start": 0.3, "end": 2.3, "text": "Stop scrolling", "style": "bold_hook" },
+      { "op": "speed_ramp", "start": 3.8, "end": 4.3, "speed": 1.5 },
+      { "op": "transition", "at": 4.3, "preset": "whip" },
+      { "op": "color_grade", "start": 0.2, "end": 8.9, "preset": "clean_contrast" }
+    ]
+  }
+}

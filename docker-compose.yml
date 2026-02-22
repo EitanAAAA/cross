@@ -18,7 +18,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - FRONTEND_ORIGIN=http://localhost:3000
+      - FRONTEND_ORIGIN=http://localhost:3010
       - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       - ./backend/storage:/app/storage
@@ -36,7 +36,7 @@ services:
     environment:
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
     ports:
-      - "3000:3000"
+      - "3010:3010"
     depends_on:
       - backend
     restart: unless-stopped

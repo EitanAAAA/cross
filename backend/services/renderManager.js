@@ -4,9 +4,12 @@ const { spawn } = require("child_process");
 const { v4: uuidv4 } = require("uuid");
 const logger = require("../utils/logger");
 const { RENDERS_DIR } = require("../utils/paths");
+const { readProjectManifest } = require("./projectStore");
+const { buildFfmpegRenderArgs, parseFfmpegTimeToSeconds } = require("./ffmpegRenderer");
 
 const MELT_BIN = process.env.MELT_BIN || "melt";
 const FFPROBE_BIN = process.env.FFPROBE_BIN || "ffprobe";
+const FFMPEG_BIN = process.env.FFMPEG_BIN || "ffmpeg";
 
 const jobs = new Map();
 
@@ -67,11 +70,10 @@ const probeDurationSeconds = (mediaPath) =>
     });
   });
 
-const startRenderJob = ({ projectId, projectPath }) => {
+const buildBaseJob = ({ projectId, projectPath }) => {
   const jobId = uuidv4();
   const outputFileName = `${projectId}-${Date.now()}.mp4`;
   const outputPath = path.join(RENDERS_DIR, outputFileName);
-  const outputResource = outputPath.replace(/\\/g, "/");
   const totalFrames = parseProjectTotalFrames(projectPath);
 
   fs.mkdirSync(RENDERS_DIR, { recursive: true });
@@ -87,12 +89,34 @@ const startRenderJob = ({ projectId, projectPath }) => {
     totalFrames,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    error: null
+    error: null,
+    warnings: []
   };
   jobs.set(jobId, job);
+  return job;
+};
 
+const finalizeRenderedOutput = async (job) => {
+  const fileStat = fs.existsSync(job.outputPath) ? fs.statSync(job.outputPath) : null;
+  const durationSeconds = await probeDurationSeconds(job.outputPath);
+  if (!fileStat || fileStat.size < 2048 || !durationSeconds || durationSeconds < 0.2) {
+    job.status = "failed";
+    job.error = "Rendered file is invalid (too short or empty)";
+    job.updatedAt = new Date().toISOString();
+    logger.error({ jobId: job.jobId, outputPath: job.outputPath, durationSeconds }, "render output invalid");
+    return false;
+  }
+  job.status = "completed";
+  job.progress = 100;
+  job.updatedAt = new Date().toISOString();
+  logger.info({ jobId: job.jobId, outputPath: job.outputPath, durationSeconds }, "render completed");
+  return true;
+};
+
+const startMltRender = ({ job }) => {
+  const outputResource = job.outputPath.replace(/\\/g, "/");
   const args = [
-    projectPath,
+    job.projectPath,
     "-consumer",
     `avformat:${outputResource}`,
     "vcodec=libx264",
@@ -107,11 +131,12 @@ const startRenderJob = ({ projectId, projectPath }) => {
   });
 
   job.status = "running";
+  job.renderEngine = "mlt";
   job.updatedAt = new Date().toISOString();
 
   const onData = (buffer) => {
     const line = buffer.toString();
-    const progress = parsePercentProgress(line) ?? parsePositionProgress(line, totalFrames);
+    const progress = parsePercentProgress(line) ?? parsePositionProgress(line, job.totalFrames);
     if (progress !== null) {
       const next = Math.max(job.progress, progress);
       if (next > job.progress) {
@@ -119,7 +144,7 @@ const startRenderJob = ({ projectId, projectPath }) => {
         job.updatedAt = new Date().toISOString();
       }
     }
-    logger.debug({ jobId, line }, "render log");
+    logger.debug({ jobId: job.jobId, line }, "render log");
   };
 
   child.stdout.on("data", onData);
@@ -129,32 +154,107 @@ const startRenderJob = ({ projectId, projectPath }) => {
     job.status = "failed";
     job.error = err.message;
     job.updatedAt = new Date().toISOString();
-    logger.error({ err, jobId }, "render process error");
+    logger.error({ err, jobId: job.jobId }, "render process error");
   });
 
   child.on("close", async (code) => {
     if (code === 0) {
-      const fileStat = fs.existsSync(outputPath) ? fs.statSync(outputPath) : null;
-      const durationSeconds = await probeDurationSeconds(outputPath);
-      if (!fileStat || fileStat.size < 2048 || !durationSeconds || durationSeconds < 0.2) {
-        job.status = "failed";
-        job.error = "Rendered file is invalid (too short or empty)";
-        job.updatedAt = new Date().toISOString();
-        logger.error({ jobId, outputPath, durationSeconds }, "render output invalid");
-        return;
-      }
-      job.status = "completed";
-      job.progress = 100;
-      job.updatedAt = new Date().toISOString();
-      logger.info({ jobId, outputPath, durationSeconds }, "render completed");
+      await finalizeRenderedOutput(job);
       return;
     }
     job.status = "failed";
     job.error = `melt exited with code ${code}`;
     job.updatedAt = new Date().toISOString();
-    logger.error({ jobId, code }, "render failed");
+    logger.error({ jobId: job.jobId, code }, "render failed");
+  });
+};
+
+const startFfmpegRender = ({ job, manifest }) => {
+  const rendered = buildFfmpegRenderArgs({
+    sourcePath: manifest.sourcePath,
+    plan: manifest.plan || {},
+    outputPath: job.outputPath
   });
 
+  job.warnings = rendered.warnings;
+  job.renderEngine = "ffmpeg";
+  job.status = "running";
+  job.updatedAt = new Date().toISOString();
+
+  const child = spawn(FFMPEG_BIN, rendered.args, {
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  probeDurationSeconds(manifest.sourcePath)
+    .then((sourceDuration) => {
+      if (rendered.estimatedDuration && rendered.estimatedDuration > 0) {
+        job.totalDurationSeconds = rendered.estimatedDuration;
+        return;
+      }
+      job.totalDurationSeconds = sourceDuration || null;
+    })
+    .catch(() => {
+      job.totalDurationSeconds = rendered.estimatedDuration || null;
+    });
+
+  const onData = (buffer) => {
+    const line = buffer.toString();
+    const parsedTime = parseFfmpegTimeToSeconds(line);
+    if (parsedTime !== null && Number.isFinite(job.totalDurationSeconds) && job.totalDurationSeconds > 0) {
+      const next = Math.min(99, Math.max(job.progress, (parsedTime / job.totalDurationSeconds) * 100));
+      if (next > job.progress) {
+        job.progress = next;
+        job.updatedAt = new Date().toISOString();
+      }
+    }
+    logger.debug({ jobId: job.jobId, line }, "ffmpeg render log");
+  };
+
+  child.stdout.on("data", onData);
+  child.stderr.on("data", onData);
+
+  child.on("error", (err) => {
+    job.status = "failed";
+    job.error = err.message;
+    job.updatedAt = new Date().toISOString();
+    logger.error({ err, jobId: job.jobId }, "ffmpeg render process error");
+  });
+
+  child.on("close", async (code) => {
+    if (code === 0) {
+      await finalizeRenderedOutput(job);
+      return;
+    }
+    job.status = "failed";
+    job.error = `ffmpeg exited with code ${code}`;
+    job.updatedAt = new Date().toISOString();
+    logger.error({ jobId: job.jobId, code }, "ffmpeg render failed");
+  });
+};
+
+const planRequiresFfmpeg = (manifest) => {
+  if (!manifest || !Array.isArray(manifest.plan?.operations)) return false;
+  if (manifest.plan.operations.length === 0) return false;
+
+  return manifest.plan.operations.some((operation) => {
+    return !["zoom_in", "zoom_out"].includes(operation.op);
+  });
+};
+
+const startRenderJob = ({ projectId, projectPath, manifestProjectId }) => {
+  const job = buildBaseJob({ projectId, projectPath });
+  const manifest = readProjectManifest(manifestProjectId || projectId);
+  const hasMltProject = Boolean(projectPath && fs.existsSync(projectPath));
+
+  if (manifest && (!hasMltProject || planRequiresFfmpeg(manifest))) {
+    logger.info({ projectId, jobId: job.jobId }, "starting ffmpeg render");
+    startFfmpegRender({ job, manifest });
+    return job;
+  }
+
+  logger.info({ projectId, jobId: job.jobId }, "starting mlt render");
+  startMltRender({ job });
   return job;
 };
 

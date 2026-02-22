@@ -3,6 +3,7 @@ const fs = require("fs");
 const express = require("express");
 const { z } = require("zod");
 const { PROJECTS_DIR } = require("../utils/paths");
+const { getManifestPath } = require("../services/projectStore");
 const { startRenderJob, getRenderJob } = require("../services/renderManager");
 
 const router = express.Router();
@@ -15,15 +16,17 @@ router.post("/", async (req, res, next) => {
   try {
     const input = renderRequestSchema.parse(req.body);
     const projectPath = path.join(PROJECTS_DIR, `${input.projectId}.mlt`);
+    const manifestPath = getManifestPath(input.projectId);
 
-    if (!fs.existsSync(projectPath)) {
-      res.status(404).json({ error: "MLT project not found", projectId: input.projectId });
+    if (!fs.existsSync(projectPath) && !fs.existsSync(manifestPath)) {
+      res.status(404).json({ error: "Project files not found", projectId: input.projectId });
       return;
     }
 
     const job = startRenderJob({
       projectId: input.projectId,
-      projectPath
+      projectPath,
+      manifestProjectId: input.projectId
     });
 
     res.status(202).json({

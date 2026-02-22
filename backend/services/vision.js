@@ -2,7 +2,7 @@ const fs = require("fs");
 const { z } = require("zod");
 const { generateJSONWithImage } = require("./ollama");
 
-const VISION_MODEL = process.env.VISION_MODEL || "llama3.2-vision:11b";
+const VISION_MODEL = process.env.VISION_MODEL || "llama3.2-vision:latest";
 
 const visionSchema = z.object({
   anchor_corrections: z
@@ -53,12 +53,23 @@ const analyzeFrameForAnchorCorrections = async (framePath, plan) => {
 
 const applyAnchorCorrections = (plan, visionResult, minConfidence = 0.65) => {
   const updated = structuredClone(plan);
+  const zoomOperationIndexes = Array.isArray(updated.operations)
+    ? updated.operations
+        .map((operation, index) => ({ operation, index }))
+        .filter((entry) => entry.operation.op === "zoom_in" || entry.operation.op === "zoom_out")
+        .map((entry) => entry.index)
+    : [];
 
   for (const correction of visionResult.anchor_corrections) {
     if (correction.confidence < minConfidence) continue;
     const transition = updated.transitions[correction.transition_index];
     if (!transition) continue;
     transition.anchor = correction.anchor;
+
+    const operationIndex = zoomOperationIndexes[correction.transition_index];
+    if (operationIndex !== undefined && updated.operations?.[operationIndex]) {
+      updated.operations[operationIndex].anchor = correction.anchor;
+    }
   }
 
   return updated;

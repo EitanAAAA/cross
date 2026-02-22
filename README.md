@@ -3,7 +3,7 @@
 TikTok-style local AI video editor:
 
 - Planner model (`qwen2.5-coder:14b`) converts instruction text into strict JSON.
-- Vision model (`llama3.2-vision:11b`) optionally analyzes extracted frames and corrects anchors.
+- Vision model (`llama3.2-vision:latest`) optionally analyzes extracted frames and corrects anchors.
 - MLT XML generator builds keyframed zoom transitions.
 - `melt` renders final MP4 asynchronously.
 - Next.js frontend uploads source, sends instruction, tracks progress, and previews result.
@@ -46,7 +46,7 @@ This is the easiest Windows path because Kdenlive bundles MLT + melt + FFmpeg + 
 
 ```bash
 ollama pull qwen2.5-coder:14b
-ollama pull llama3.2-vision:11b
+ollama pull llama3.2-vision:latest
 ```
 
 ## 2) Environment Setup
@@ -71,11 +71,11 @@ Copy-Item .env.example .env
 NODE_ENV=development
 PORT=4000
 LOG_LEVEL=info
-FRONTEND_ORIGIN=http://localhost:3000
+FRONTEND_ORIGIN=http://localhost:3010
 
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 PLANNER_MODEL=qwen2.5-coder:14b
-VISION_MODEL=llama3.2-vision:11b
+VISION_MODEL=llama3.2-vision:latest
 OLLAMA_TIMEOUT_MS=120000
 
 MAX_UPLOAD_MB=2048
@@ -122,7 +122,7 @@ npm install
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+Open: `http://localhost:3010`
 
 ## 4) Docker Compose (Optional)
 
@@ -132,7 +132,7 @@ docker compose up --build
 
 Services:
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3010`
 - Backend: `http://localhost:4000`
 - Ollama: `http://localhost:11434`
 
@@ -224,6 +224,23 @@ Response:
 }
 ```
 
+### `GET /api/capabilities`
+
+Returns backend operation support registry and implementation status.
+
+Response:
+
+```json
+{
+  "operations": [
+    { "op": "trim", "status": "implemented", "engines": ["ffmpeg"] },
+    { "op": "zoom_in", "status": "implemented", "engines": ["mlt"] },
+    { "op": "transition_motion_blur", "status": "planned", "engines": [] }
+  ],
+  "generatedAt": "2026-02-21T17:47:13.627Z"
+}
+```
+
 ### `GET /api/render/:jobId`
 
 Response while rendering:
@@ -292,7 +309,22 @@ ai-video-editor/
 2. Submit instruction via `/api/edit`.
 3. Backend calls Qwen planner through Ollama.
 4. Optional frame extraction (`ffmpeg`) + vision correction through llama3.2-vision.
-5. Backend generates MLT XML with keyframed affine zoom.
-6. Start async render with `melt` via `/api/render`.
+5. Backend stores project manifest (`plan.operations`) and optionally generates MLT XML when zoom transitions exist.
+6. Start async render via `/api/render` (adaptive engine: MLT for zoom-only, FFmpeg for advanced ops).
 7. Poll `/api/render/:jobId` until completed.
 8. Frontend plays rendered MP4 from `/renders/...`.
+
+## 9) Model Training Workspace (Advanced Planner)
+
+A local training workspace is available under `training/`.
+
+Key commands:
+
+```powershell
+node training/scripts/validate_annotated.js
+node training/scripts/check_coverage.js
+node training/scripts/build_sft_dataset.js
+node training/scripts/split_dataset.js
+```
+
+This prepares instruction-to-plan datasets for fine-tuning a stronger planner model (beyond zoom-only plans).

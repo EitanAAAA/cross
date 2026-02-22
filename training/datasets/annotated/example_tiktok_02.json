@@ -1,0 +1,63 @@
+{
+    "id":  "product_broll_01",
+    "instruction":  "Edit this product b-roll with cinematic but energetic pacing.",
+    "style_tags":  [
+                       "tiktok",
+                       "product",
+                       "cinematic"
+                   ],
+    "plan":  {
+                 "operations":  [
+                                    {
+                                        "op":  "trim",
+                                        "start":  0.0,
+                                        "end":  12.0
+                                    },
+                                    {
+                                        "op":  "pan",
+                                        "start":  0.5,
+                                        "end":  1.8,
+                                        "direction":  "right",
+                                        "strength":  0.3,
+                                        "easing":  "ease-in-out"
+                                    },
+                                    {
+                                        "op":  "rotate",
+                                        "start":  2.2,
+                                        "end":  2.8,
+                                        "degrees":  6,
+                                        "easing":  "ease-out"
+                                    },
+                                    {
+                                        "op":  "zoom_out",
+                                        "start":  4.0,
+                                        "end":  4.8,
+                                        "anchor":  "center",
+                                        "strength":  1.25,
+                                        "easing":  "ease-in-out"
+                                    },
+                                    {
+                                        "op":  "blur",
+                                        "start":  5.3,
+                                        "end":  5.8,
+                                        "intensity":  0.5
+                                    },
+                                    {
+                                        "op":  "beat_sync",
+                                        "start":  0.0,
+                                        "end":  12.0,
+                                        "style":  "medium"
+                                    },
+                                    {
+                                        "op":  "transition",
+                                        "at":  6.0,
+                                        "preset":  "flash"
+                                    },
+                                    {
+                                        "op":  "freeze_frame",
+                                        "start":  7.1,
+                                        "end":  7.35
+                                    }
+                                ]
+             }
+}

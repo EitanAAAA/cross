@@ -5,6 +5,8 @@ const { v4: uuidv4 } = require("uuid");
 const { z } = require("zod");
 const { createEditPlan } = require("../services/planner");
 const { writeMltProject } = require("../services/mltBuilder");
+const { writeProjectManifest } = require("../services/projectStore");
+const { summarizePlanCapabilities } = require("../services/capabilities");
 const { extractFrame } = require("../services/video");
 const { analyzeFrameForAnchorCorrections, applyAnchorCorrections } = require("../services/vision");
 const { findUploadById, PROJECTS_DIR } = require("../utils/paths");
@@ -83,7 +85,8 @@ router.post("/", async (req, res, next) => {
     mark("planner_call", "running", { model: process.env.PLANNER_MODEL || "qwen2.5-coder:14b" });
     const plannerPlan = await createEditPlan(input.instruction);
     mark("planner_call", "completed", {
-      transitionsCount: plannerPlan.transitions.length
+      transitionsCount: plannerPlan.transitions.length,
+      operationsCount: plannerPlan.operations.length
     });
 
     let finalPlan = plannerPlan;
@@ -94,32 +97,65 @@ router.post("/", async (req, res, next) => {
     } else if (plannerPlan.transitions.length === 0) {
       mark("vision_analysis", "skipped", { reason: "no_transitions" });
     } else {
-      mark("vision_analysis", "running", { model: process.env.VISION_MODEL || "llama3.2-vision:11b" });
+      mark("vision_analysis", "running", { model: process.env.VISION_MODEL || "llama3.2-vision:latest" });
       const firstTransition = plannerPlan.transitions[0];
       const frameSecond = Math.max(0, (firstTransition.start + firstTransition.end) / 2);
       const framePath = path.join(PROJECTS_DIR, `${uuidv4()}.jpg`);
       try {
-        await extractFrame({ sourcePath: upload.path, atSeconds: frameSecond, outputPath: framePath });
-        visionResult = await analyzeFrameForAnchorCorrections(framePath, plannerPlan);
-        finalPlan = applyAnchorCorrections(plannerPlan, visionResult);
-        mark("vision_analysis", "completed", {
-          corrections: visionResult.anchor_corrections.length
-        });
+        try {
+          await extractFrame({ sourcePath: upload.path, atSeconds: frameSecond, outputPath: framePath });
+          visionResult = await analyzeFrameForAnchorCorrections(framePath, plannerPlan);
+          finalPlan = applyAnchorCorrections(plannerPlan, visionResult);
+          mark("vision_analysis", "completed", {
+            corrections: visionResult.anchor_corrections.length
+          });
+        } catch (visionError) {
+          visionResult = {
+            anchor_corrections: [],
+            warning: visionError.message,
+            fallbackApplied: true
+          };
+          finalPlan = plannerPlan;
+          mark("vision_analysis", "skipped", {
+            reason: visionError.message,
+            fallback: "planner_plan_retained"
+          });
+        }
       } finally {
         fs.rmSync(framePath, { force: true });
       }
     }
 
     const projectId = uuidv4();
-    mark("mlt_project_generation", "running", { projectId });
-    await writeMltProject({
+    const capabilitySummary = summarizePlanCapabilities(finalPlan);
+
+    mark("project_manifest_generation", "running", {
+      projectId,
+      recommendedRenderEngine: capabilitySummary.recommendedRenderEngine
+    });
+    const manifestPath = writeProjectManifest({
       projectId,
       sourcePath: upload.path,
-      plan: finalPlan
+      plan: finalPlan,
+      capabilitySummary
     });
-    mark("mlt_project_generation", "completed", {
-      projectFile: `${projectId}.mlt`
+    mark("project_manifest_generation", "completed", {
+      manifestFile: path.basename(manifestPath)
     });
+
+    if (finalPlan.transitions.length > 0) {
+      mark("mlt_project_generation", "running", { projectId });
+      await writeMltProject({
+        projectId,
+        sourcePath: upload.path,
+        plan: finalPlan
+      });
+      mark("mlt_project_generation", "completed", {
+        projectFile: `${projectId}.mlt`
+      });
+    } else {
+      mark("mlt_project_generation", "skipped", { reason: "no_zoom_transitions" });
+    }
 
     logger.info({ projectId, uploadId: upload.id }, "edit plan created");
 
@@ -129,6 +165,7 @@ router.post("/", async (req, res, next) => {
       uploadId: upload.id,
       plannerPlan,
       finalPlan,
+      capabilitySummary,
       visionResult,
       processingTrace: trace
     });

@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Video Training Lab</title>
+  <style>
+    :root {
+      --bg: #0f141b;
+      --panel: #151d27;
+      --panel-2: #1a2431;
+      --line: #2b3a4d;
+      --text: #eaf1f8;
+      --muted: #93a6b8;
+      --good: #89f0c0;
+      --warn: #ffd79a;
+      --bad: #ff9d9d;
+      --accent: #66b7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background:
+        radial-gradient(1000px 420px at 8% -15%, #1e3145, transparent 70%),
+        radial-gradient(900px 420px at 95% -25%, #2b2d4b, transparent 62%),
+        var(--bg);
+    }
+
+    .wrap {
+      width: min(1180px, 94vw);
+      margin: 20px auto 34px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: 0.2px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #d9e8f7;
+      background: rgba(16, 23, 31, 0.55);
+    }
+
+    .grid-2 {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1.25fr 1fr;
+    }
+
+    .grid-3 {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.02rem;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      color: #d6e6f8;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.4;
+      font-size: 0.93rem;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(12, 18, 25, 0.45);
+      display: grid;
+      gap: 10px;
+    }
+
+    .step-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      color: #d7ebff;
+    }
+
+    .idx {
+      width: 22px;
+      height: 22px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      border: 1px solid #4d6f90;
+      color: #d8ecff;
+      background: #24394f;
+      font-size: 12px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid #41576e;
+      border-radius: 9px;
+      padding: 9px 12px;
+      color: #edf5fe;
+      background: #253547;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.15px;
+    }
+
+    button:hover { filter: brightness(1.07); }
+    button.primary { background: linear-gradient(180deg, #2f628f, #244d70); border-color: #4c80ad; }
+    button.good { background: linear-gradient(180deg, #2f6e56, #265843); border-color: #4e8f72; }
+    button.warn { background: linear-gradient(180deg, #7a612e, #665025); border-color: #9d7f41; }
+    button.danger { background: linear-gradient(180deg, #7c3f3f, #613131); border-color: #a56c6c; }
+    button.subtle { background: #1e2a37; border-color: #3a4d62; color: #d6e5f5; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    input[type=file] {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px dashed #4b6886;
+      padding: 10px;
+      background: rgba(15, 22, 31, 0.65);
+      color: #a6bfd8;
+    }
+
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(12, 17, 24, 0.5);
+      color: var(--muted);
+      min-height: 42px;
+      padding: 10px;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .ok { color: var(--good); }
+    .warn-text { color: var(--warn); }
+    .danger-text { color: var(--bad); }
+    .code { font-family: Consolas, "Courier New", monospace; font-size: 0.84rem; }
+
+    .stats {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(13, 20, 28, 0.55);
+    }
+
+    .stat .k { font-size: 12px; color: var(--muted); }
+    .stat .v { margin-top: 4px; font-size: 1.22rem; font-weight: 700; }
+
+    .coverage {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(12, 17, 24, 0.45);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      margin: 4px 6px 0 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(20, 29, 39, 0.65);
+      font-size: 12px;
+      color: #d6e7f8;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(12, 17, 24, 0.35);
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: #d5e8fb;
+    }
+
+    .logs {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0b1016;
+      min-height: 280px;
+      max-height: 430px;
+      overflow: auto;
+      padding: 10px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .log-line { margin: 0 0 4px; }
+    .info { color: #cde7ff; }
+    .error { color: var(--bad); }
+
+    ul {
+      margin: 0;
+      padding-left: 16px;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 1020px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel hero">
+      <h1>Train TikTok Editing Style (Planner Model)</h1>
+      <p>
+        Goal: upload examples of the style you want, auto-generate/edit labels, then train a planner that outputs pro edit operations (not zoom-only).
+      </p>
+      <div class="chips">
+        <span class="chip">Planner Training Target: Qwen</span>
+        <span class="chip">Vision Model: Runtime Assistance</span>
+        <span class="chip">Port: 3011</span>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>Recommended Flow</h2>
+
+        <div class="step">
+          <div class="step-title"><span class="idx">1</span> Upload Training Package</div>
+          <p>Upload a zip with your sample edit videos. Best quality comes from videos + labeled JSON examples in the same zip.</p>
+          <input id="zipInput" type="file" accept=".zip" />
+          <div class="row">
+            <button id="uploadBtn" class="primary">Upload ZIP</button>
+            <button id="refreshBtn" class="subtle">Refresh Stats</button>
+          </div>
+          <div id="uploadStatus" class="status">Waiting for upload.</div>
+        </div>
+
+        <div class="step">
+          <div class="step-title"><span class="idx">2</span> Build Dataset + Sanity Check</div>
+          <p>If you uploaded only videos, run auto-label first. Then validate, coverage, build, split, python-prepare, dry-run.</p>
+          <div class="row">
+            <button id="quickFlowBtn" class="good">Run Recommended Pipeline</button>
+            <button class="good" data-action="bootstrap">Auto Label Videos</button>
+            <button class="good" data-action="validate">Validate</button>
+          </div>
+          <div class="status" id="pipelineStatus">No action yet.</div>
+        </div>
+
+        <div class="step">
+          <div class="step-title"><span class="idx">3</span> Train</div>
+          <p>Use dry run first. Start real train only after python/cuda status looks good.</p>
+          <div class="row">
+            <button class="good" data-action="py-train-dry">Dry Run Train</button>
+            <button class="warn" data-action="py-train">Start Train</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>What To Upload For Best Results</h2>
+        <ul>
+          <li>Required: edited video examples (`.mp4`, `.mov`, etc).</li>
+          <li>Strongly recommended: labeled annotation JSON files (`instruction + plan.operations`).</li>
+          <li>If you only upload videos: use <span class="code">Auto Label Videos</span> to create starter labels automatically.</li>
+          <li>Best model quality: diverse examples across transitions, cuts, captions, speed ramps, color, motion.</li>
+          <li>Do not train only one effect type. Balance operation coverage.</li>
+        </ul>
+
+        <details style="margin-top:10px;">
+          <summary>Advanced Actions</summary>
+          <div class="row" style="margin-top:10px;">
+            <button class="subtle" data-action="quality">Quality Report</button>
+            <button class="subtle" data-action="coverage">Coverage</button>
+            <button class="subtle" data-action="build">Build SFT</button>
+            <button class="subtle" data-action="split">Split</button>
+            <button class="subtle" data-action="run-all">Run All</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button class="subtle" data-action="py-check">Python Check</button>
+            <button class="subtle" data-action="py-install-cpu">Install CPU Deps</button>
+            <button class="subtle" data-action="py-install-cuda">Install CUDA Deps</button>
+            <button class="subtle" data-action="py-prepare">Prepare Py Dataset</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button id="downloadSchemaBtn" class="subtle">Download Schema</button>
+            <button id="downloadPromptBtn" class="subtle">Download Prompt</button>
+            <button id="downloadTemplateBtn" class="subtle">Download Template</button>
+            <button id="exportBundleBtn" class="subtle">Export Training Bundle</button>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Dataset Status</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">Annotated JSON</div><div id="statAnnotated" class="v">0</div></div>
+        <div class="stat"><div class="k">Raw Videos</div><div id="statRaw" class="v">0</div></div>
+        <div class="stat"><div class="k">SFT JSONL</div><div id="statSft" class="v">0</div></div>
+        <div class="stat"><div class="k">Split JSONL</div><div id="statSplit" class="v">0</div></div>
+      </div>
+      <p id="taskInfo" style="margin-top:10px;">Task: idle</p>
+      <div id="coverage" class="coverage">Coverage: -</div>
+    </section>
+
+    <section class="grid-3">
+      <div class="panel">
+        <h3>Model Status</h3>
+        <div id="modelStatus" class="status">Checking Ollama models...</div>
+      </div>
+      <div class="panel">
+        <h3>Python/CUDA Status</h3>
+        <div id="pythonStatus" class="status">Checking Python training environment...</div>
+      </div>
+      <div class="panel">
+        <h3>Training Tip</h3>
+        <p>
+          Videos teach visual taste. JSON labels teach exact edit decisions.
+          For pro results, keep both: examples + high-quality labeled plans.
+        </p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Live Logs</h2>
+      <div id="logs" class="logs"></div>
+    </section>
+  </main>
+
+  <script>
+    const zipInput = document.getElementById("zipInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const quickFlowBtn = document.getElementById("quickFlowBtn");
+    const uploadStatus = document.getElementById("uploadStatus");
+    const pipelineStatus = document.getElementById("pipelineStatus");
+    const logsEl = document.getElementById("logs");
+    const taskInfo = document.getElementById("taskInfo");
+    const coverageEl = document.getElementById("coverage");
+    const modelStatusEl = document.getElementById("modelStatus");
+    const downloadSchemaBtn = document.getElementById("downloadSchemaBtn");
+    const downloadPromptBtn = document.getElementById("downloadPromptBtn");
+    const downloadTemplateBtn = document.getElementById("downloadTemplateBtn");
+    const exportBundleBtn = document.getElementById("exportBundleBtn");
+    const pythonStatusEl = document.getElementById("pythonStatus");
+
+    const statAnnotated = document.getElementById("statAnnotated");
+    const statRaw = document.getElementById("statRaw");
+    const statSft = document.getElementById("statSft");
+    const statSplit = document.getElementById("statSplit");
+
+    let actionBusy = false;
+
+    const appendLog = (entry) => {
+      const line = document.createElement("div");
+      line.className = `log-line ${entry.level || "info"}`;
+      const meta = entry.meta ? ` ${JSON.stringify(entry.meta)}` : "";
+      line.textContent = `[${entry.at}] ${entry.level?.toUpperCase() || "INFO"} ${entry.message}${meta}`;
+      logsEl.appendChild(line);
+      if (logsEl.children.length > 700) {
+        logsEl.removeChild(logsEl.firstChild);
+      }
+      logsEl.scrollTop = logsEl.scrollHeight;
+    };
+
+    const setStatus = (el, text, isError = false) => {
+      el.textContent = text;
+      el.style.color = isError ? "#ff9d9d" : "#93a6b8";
+    };
+
+    const setActionBusy = (busy) => {
+      actionBusy = busy;
+      const actionButtons = document.querySelectorAll("button[data-action], #quickFlowBtn, #uploadBtn");
+      actionButtons.forEach((btn) => {
+        btn.disabled = busy;
+      });
+    };
+
+    const refreshStats = async () => {
+      const res = await fetch("/api/stats");
+      const data = await res.json();
+      statAnnotated.textContent = data.annotatedJson;
+      statRaw.textContent = data.rawVideos;
+      statSft.textContent = data.sftJsonl;
+      statSplit.textContent = data.splitJsonl;
+
+      taskInfo.textContent = data.activeTask
+        ? `Task: ${data.activeTask.action} (${data.activeTask.status}) since ${data.activeTask.startedAt}`
+        : "Task: idle";
+
+      const cov = Array.isArray(data.operationCoverage) ? data.operationCoverage : [];
+      coverageEl.innerHTML = cov.length
+        ? `Coverage: ${cov.map((item) => `<span class="badge"><span class="code">${item.op}</span>: ${item.count}</span>`).join("")}`
+        : "Coverage: no operation labels yet.";
+    };
+
+    const refreshModelStatus = async () => {
+      try {
+        const res = await fetch("/api/model-status");
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || "Failed to fetch model status");
+
+        const planner = body.plannerInstalled ? "ok" : "missing";
+        const vision = body.visionInstalled ? "ok" : "missing";
+        modelStatusEl.innerHTML = `
+          <div><b>Ollama:</b> <span class="code">${body.ollamaBase}</span></div>
+          <div><b>Planner:</b> <span class="${planner === "ok" ? "ok" : "danger-text"}">${body.plannerModel} (${planner})</span></div>
+          <div><b>Vision:</b> <span class="${vision === "ok" ? "ok" : "danger-text"}">${body.visionModel} (${vision})</span></div>
+          <div style="margin-top:6px;" class="code">${(body.models || []).join(", ") || "-"}</div>
+        `;
+      } catch (err) {
+        modelStatusEl.innerHTML = `<span class="danger-text">${err.message || "Model status error"}</span>`;
+      }
+    };
+
+    const refreshPythonStatus = async () => {
+      try {
+        const res = await fetch("/api/python-status");
+        const body = await res.json();
+        if (!res.ok || !body.ok) throw new Error(body.error || "Failed to fetch Python status");
+
+        const py = body.python || {};
+        const pip = body.pip || {};
+        const nvidia = body.nvidia || {};
+        const torch = body.torch || {};
+
+        const versionClass = py.recommended ? "ok" : py.compatible ? "warn-text" : "danger-text";
+        const cudaClass = nvidia.cuda_visible ? "ok" : "danger-text";
+        const torchClass = torch.cuda_available ? "ok" : "warn-text";
+
+        pythonStatusEl.innerHTML = `
+          <div><b>Python:</b> <span class="${versionClass}">${py.version || "unknown"}</span></div>
+          <div><b>Pip:</b> <span class="${pip.installed ? "ok" : "danger-text"}">${pip.installed ? "installed" : "missing"}</span></div>
+          <div><b>CUDA visible:</b> <span class="${cudaClass}">${nvidia.cuda_visible ? "yes" : "no"}</span></div>
+          <div><b>Torch:</b> <span class="${torch.installed ? "ok" : "danger-text"}">${torch.installed ? (torch.version || "installed") : "missing"}</span></div>
+          <div><b>Torch CUDA:</b> <span class="${torchClass}">${torch.cuda_available ? "enabled" : "disabled"}</span></div>
+          ${py.recommendation ? `<div class="warn-text" style="margin-top:6px;">${py.recommendation}</div>` : ""}
+        `;
+      } catch (err) {
+        pythonStatusEl.innerHTML = `<span class="danger-text">${err.message || "Python status error"}</span>`;
+      }
+    };
+
+    const uploadZip = async () => {
+      if (!zipInput.files?.[0]) {
+        setStatus(uploadStatus, "Choose a .zip file first", true);
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      setStatus(uploadStatus, "Uploading and importing ZIP...");
+
+      try {
+        const fd = new FormData();
+        fd.append("datasetZip", zipInput.files[0]);
+        const res = await fetch("/api/upload-zip", { method: "POST", body: fd });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || "Upload failed");
+
+        const s = body.summary;
+        const guidance = (body.guidance || []).join(" ");
+        setStatus(
+          uploadStatus,
+          `Imported ${s.extractedFiles} files. Annotated JSON: ${s.copiedAnnotatedJson}. Raw videos: ${s.copiedRawVideos}. ${guidance}`
+        );
+        await refreshStats();
+      } catch (err) {
+        setStatus(uploadStatus, err.message || "Upload failed", true);
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    };
+
+    const callAction = async (action) => {
+      const res = await fetch(`/api/pipeline/${action}`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || `Action failed: ${action}`);
+      }
+      return body;
+    };
+
+    const runAction = async (action) => {
+      if (actionBusy) return;
+      setActionBusy(true);
+      setStatus(pipelineStatus, `Running ${action}...`);
+      try {
+        await callAction(action);
+        setStatus(pipelineStatus, `Completed: ${action}`);
+        await refreshStats();
+        await refreshPythonStatus();
+      } catch (err) {
+        setStatus(pipelineStatus, err.message || `Action failed: ${action}`, true);
+      } finally {
+        setActionBusy(false);
+      }
+    };
+
+    const runRecommendedPipeline = async () => {
+      if (actionBusy) return;
+      setActionBusy(true);
+
+      const sequence = ["bootstrap", "validate", "coverage", "build", "split", "py-prepare", "py-train-dry"];
+      try {
+        for (const action of sequence) {
+          setStatus(pipelineStatus, `Running ${action}...`);
+          await callAction(action);
+          await refreshStats();
+        }
+        setStatus(pipelineStatus, "Recommended pipeline completed.");
+        await refreshPythonStatus();
+      } catch (err) {
+        setStatus(pipelineStatus, err.message || "Recommended pipeline failed", true);
+      } finally {
+        setActionBusy(false);
+      }
+    };
+
+    uploadBtn.addEventListener("click", uploadZip);
+    refreshBtn.addEventListener("click", refreshStats);
+    quickFlowBtn.addEventListener("click", runRecommendedPipeline);
+
+    document.querySelectorAll("button[data-action]").forEach((btn) => {
+      btn.addEventListener("click", () => runAction(btn.dataset.action));
+    });
+
+    downloadSchemaBtn.addEventListener("click", () => { window.location.href = "/api/download/schema"; });
+    downloadPromptBtn.addEventListener("click", () => { window.location.href = "/api/download/prompt"; });
+    downloadTemplateBtn.addEventListener("click", () => { window.location.href = "/api/download/template"; });
+    exportBundleBtn.addEventListener("click", () => { window.location.href = "/api/export/training-bundle"; });
+
+    const stream = new EventSource("/api/log-stream");
+    stream.onmessage = (event) => {
+      try {
+        appendLog(JSON.parse(event.data));
+      } catch {
+        // ignore malformed messages
+      }
+    };
+    stream.onerror = () => {
+      setStatus(pipelineStatus, "Log stream disconnected. Reload page.", true);
+    };
+
+    (async () => {
+      try {
+        const logsRes = await fetch("/api/logs?limit=120");
+        const logs = await logsRes.json();
+        (logs.logs || []).forEach(appendLog);
+        await refreshStats();
+        await refreshModelStatus();
+        await refreshPythonStatus();
+      } catch (err) {
+        setStatus(pipelineStatus, err.message || "Failed to load initial state", true);
+      }
+
+      setInterval(() => {
+        refreshStats().catch(() => {});
+        refreshModelStatus().catch(() => {});
+        refreshPythonStatus().catch(() => {});
+      }, 8000);
+    })();
+  </script>
+</body>
+</html>

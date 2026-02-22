@@ -6,6 +6,7 @@ const pinoHttp = require("pino-http");
 const uploadRoute = require("./routes/upload");
 const editRoute = require("./routes/edit");
 const renderRoute = require("./routes/render");
+const capabilitiesRoute = require("./routes/capabilities");
 const logger = require("./utils/logger");
 const { ensureStorageDirs, RENDERS_DIR, UPLOADS_DIR } = require("./utils/paths");
 
@@ -69,6 +70,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/upload", uploadRoute);
 app.use("/api/edit", editRoute);
 app.use("/api/render", renderRoute);
+app.use("/api/capabilities", capabilitiesRoute);
 
 app.use("/renders", express.static(RENDERS_DIR));
 app.use("/uploads", express.static(UPLOADS_DIR));

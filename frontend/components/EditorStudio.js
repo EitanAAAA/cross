@@ -13,6 +13,7 @@ const STEP_TEMPLATE = [
   { id: "upload", label: "Upload source video" },
   { id: "planner", label: "Qwen planning" },
   { id: "vision", label: "Vision anchor analysis" },
+  { id: "manifest", label: "Project manifest generation" },
   { id: "mlt", label: "MLT project generation" },
   { id: "render_queue", label: "Render queue" },
   { id: "render", label: "Render MP4" }
@@ -102,6 +103,7 @@ export default function EditorStudio() {
       upload_lookup: "upload",
       planner_call: "planner",
       vision_analysis: "vision",
+      project_manifest_generation: "manifest",
       mlt_project_generation: "mlt"
     };
 
@@ -156,6 +158,7 @@ export default function EditorStudio() {
     setStatus("planning");
     markStep("request", "running");
     markStep("planner", "pending");
+    markStep("manifest", "pending");
     if (useVision) {
       markStep("vision", "pending");
     } else {
@@ -185,7 +188,12 @@ export default function EditorStudio() {
 
     setEditResponse(body);
     markStep("request", "completed");
-    markStep("planner", "completed", `transitions=${body?.plannerPlan?.transitions?.length || 0}`);
+    markStep(
+      "planner",
+      "completed",
+      `ops=${body?.plannerPlan?.operations?.length || 0}, transitions=${body?.plannerPlan?.transitions?.length || 0}`
+    );
+    markStep("manifest", "completed", body?.capabilitySummary?.recommendedRenderEngine || "auto");
     if (useVision && body?.visionResult) {
       markStep(
         "vision",
@@ -205,7 +213,7 @@ export default function EditorStudio() {
     markStep("render", "pending");
     lastRenderProgressRef.current = -1;
     setPipelineProgress(72);
-    pushLog("Starting async melt render...");
+    pushLog("Starting adaptive render (MLT/FFmpeg)...");
 
     const response = await fetch(`${backendBase}/api/render`, {
       method: "POST",
@@ -388,6 +396,12 @@ export default function EditorStudio() {
       <section className="grid">
         <div className="card">
           <h2>Planner JSON</h2>
+          {editResponse?.capabilitySummary ? (
+            <p className="muted">
+              Render recommendation: {editResponse.capabilitySummary.recommendedRenderEngine} | Unsupported ops:{" "}
+              {editResponse.capabilitySummary.unsupportedOperations?.length || 0}
+            </p>
+          ) : null}
           <pre className="json-box">
             {editResponse ? JSON.stringify(editResponse.finalPlan, null, 2) : "No plan yet."}
           </pre>
